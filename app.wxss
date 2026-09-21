@@ -1,0 +1,20 @@
+page {
+  background: #f7f7fb;
+  color: #202235;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 28rpx;
+  line-height: 1.4;
+}
+
+view,
+text,
+button,
+input,
+textarea,
+image {
+  box-sizing: border-box;
+}
+
+button::after {
+  border: 0;
+}

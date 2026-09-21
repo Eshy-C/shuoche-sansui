@@ -1,0 +1,105 @@
+<view class="records-page">
+  <view class="records-hero"></view>
+
+  <scroll-view class="records-scroll" scroll-y="true" enhanced="true" show-scrollbar="false">
+    <view class="status-space" style="height: {{statusBarHeight}}px;"></view>
+
+    <view class="top-bar">
+      <view class="brand-lockup">
+        <view class="brand-mark">
+          <view class="brand-mark__bubble"></view>
+          <view class="brand-mark__line brand-mark__line--top"></view>
+          <view class="brand-mark__line brand-mark__line--bottom"></view>
+        </view>
+        <text class="brand-name">说车三岁</text>
+      </view>
+      <view class="native-capsule-space"></view>
+    </view>
+
+    <view class="records-heading">
+      <view class="records-heading__row">
+        <view>
+          <text class="records-title">我的车辆</text>
+          <text class="records-subtitle">保存过的档案，都可以继续补录</text>
+        </view>
+        <button class="new-record-button" bindtap="createRecord" hover-class="none">
+          <text class="new-record-button__plus">+</text>
+          <text>新建</text>
+        </button>
+      </view>
+      <view class="records-summary">
+        <view class="summary-dot"></view>
+        <text>共 {{records.length}} 条车辆档案</text>
+      </view>
+      <text class="records-sync-status records-sync-status--{{cloudSyncState}}">{{cloudSyncMessage}}</text>
+    </view>
+
+    <view wx:if="{{records.length === 0}}" class="empty-state">
+      <view class="empty-state__icon">
+        <view class="empty-state__car"></view>
+        <view class="empty-state__plus">+</view>
+      </view>
+      <text class="empty-state__title">还没有车辆档案</text>
+      <text class="empty-state__desc">先建立第一辆车，之后可以随时回来继续录入</text>
+      <button class="empty-state__button" bindtap="createRecord" hover-class="none">新建第一辆车</button>
+    </view>
+
+    <view wx:else class="record-list">
+      <view wx:for="{{records}}" wx:key="id" class="record-card">
+        <view class="record-card__top">
+          <view class="record-cover {{item.coverPath ? 'record-cover--image' : ''}}">
+            <image wx:if="{{item.coverPath}}" class="record-cover__image" src="{{item.coverPath}}" mode="aspectFill"></image>
+            <block wx:else>
+              <view class="record-cover__car"></view>
+              <view class="record-cover__plus">+</view>
+            </block>
+          </view>
+          <view class="record-card__content">
+            <view class="record-card__title-row">
+              <text class="record-card__title">{{item.displayName}}</text>
+              <view class="record-card__actions">
+                <text class="record-card__status">{{item.statusLabel}}</text>
+                <button
+                  class="delete-record-button"
+                  bindtap="deleteRecord"
+                  data-id="{{item.id}}"
+                  hover-class="none"
+                >删除</button>
+              </view>
+            </view>
+            <text class="record-card__date">最近编辑 {{item.updatedAtLabel}}</text>
+            <view class="record-card__sync-row">
+              <text class="record-card__sync-label {{item.cloudSynced ? 'record-card__sync-label--cloud' : 'record-card__sync-label--local'}}">{{item.cloudSynced ? '云端记录' : '本机待同步'}}</text>
+            </view>
+            <view class="record-card__points">
+              <text class="record-card__points-title">卖点文案</text>
+              <text class="record-card__points-value {{item.sellingPointsEmpty ? 'record-card__points-value--empty' : ''}}" selectable="true">{{item.sellingPointsPreview}}</text>
+            </view>
+            <view class="record-card__progress-row">
+              <text>{{item.uploadedVehicleCount}} / 9 张照片</text>
+              <text class="record-card__progress-label">{{item.progressLabel}}</text>
+            </view>
+            <view class="record-progress">
+              <view class="record-progress__value" style="width: {{item.progressPercent}}%;"></view>
+            </view>
+          </view>
+        </view>
+        <view class="record-card__bottom">
+          <text class="record-card__hint">{{item.nextStepLabel}}</text>
+          <button class="continue-button" bindtap="continueRecord" data-id="{{item.id}}" hover-class="none">
+            <text>继续录入</text>
+            <text class="continue-button__arrow">›</text>
+          </button>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view wx:if="{{records.length > 0}}" class="records-bottom-bar">
+    <button class="records-bottom-bar__button" bindtap="createRecord" hover-class="none">
+      <text class="records-bottom-bar__plus">+</text>
+      <text>新建车辆档案</text>
+    </button>
+    <view class="home-indicator"></view>
+  </view>
+</view>

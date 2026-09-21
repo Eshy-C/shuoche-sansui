@@ -1,0 +1,158 @@
+<view class="page-shell">
+  <view class="hero-background"></view>
+
+  <scroll-view class="page-scroll" scroll-y="true" enhanced="true" show-scrollbar="false">
+    <view class="status-space" style="height: {{statusBarHeight}}px;"></view>
+
+    <view class="top-bar">
+      <view class="brand-lockup">
+        <view class="brand-mark">
+          <view class="brand-mark__bubble"></view>
+          <view class="brand-mark__line brand-mark__line--top"></view>
+          <view class="brand-mark__line brand-mark__line--bottom"></view>
+        </view>
+        <text class="brand-name">说车三岁</text>
+      </view>
+      <view class="native-capsule-space"></view>
+    </view>
+
+    <view class="page-heading">
+      <view class="page-heading__row">
+        <text class="page-title">{{pageTitle}}</text>
+        <view class="heading-pill">素材录入</view>
+      </view>
+      <text class="page-subtitle">照片和卖点填好，为视频准备素材</text>
+      <view class="page-heading__meta">
+        <input
+          class="record-name-input"
+          maxlength="40"
+          placeholder="给这辆车起个名字，例如：2022 款家用轿车"
+          placeholder-class="record-name-input__placeholder"
+          value="{{recordName}}"
+          bindinput="onRecordNameInput"
+        ></input>
+        <button class="record-list-link" bindtap="goToRecords" hover-class="none">
+          <text>已保存 {{recordCount}} 条</text>
+          <text class="chevron">›</text>
+        </button>
+      </view>
+    </view>
+
+    <view class="content-wrap">
+      <view class="section-card sales-card">
+        <view class="section-heading">
+          <view class="section-heading__main">
+            <view class="section-number">01</view>
+            <text class="section-title">销售形象</text>
+          </view>
+          <text class="section-hint">必填 · 用于视频出镜</text>
+        </view>
+
+        <button class="sales-upload" bindtap="chooseSalesPhoto" hover-class="none">
+          <view class="sales-avatar {{salesPhoto ? 'sales-avatar--has-image' : ''}}">
+            <image wx:if="{{salesPhoto}}" class="sales-avatar__image" src="{{salesPhoto}}" mode="aspectFill"></image>
+            <block wx:else>
+              <view class="sales-avatar__head"></view>
+              <view class="sales-avatar__body"></view>
+            </block>
+            <view class="sales-avatar__plus">+</view>
+          </view>
+          <view class="sales-upload__copy">
+            <text class="sales-upload__title">{{salesPhoto ? '已添加销售照片' : '添加一张正面半身照'}}</text>
+            <text class="sales-upload__desc">光线清晰，让客户记住你</text>
+            <view class="minor-button">
+              <view class="gallery-icon">
+                <view class="gallery-icon__mount"></view>
+                <view class="gallery-icon__dot"></view>
+              </view>
+              <text>选择照片</text>
+            </view>
+          </view>
+        </button>
+      </view>
+
+      <view class="section-card vehicle-card">
+        <view class="section-heading">
+          <view class="section-heading__main">
+            <view class="section-number">02</view>
+            <text class="section-title">车辆照片</text>
+            <text class="photo-count">{{uploadedVehicleCount}} / 9</text>
+          </view>
+          <button class="text-button" bindtap="chooseVehicleBatch" hover-class="none">
+            <text>批量上传</text>
+            <text class="chevron">›</text>
+          </button>
+        </view>
+        <text class="section-description">外观、内饰、细节，按格上传更省心</text>
+
+        <view class="photo-grid">
+          <view
+            wx:for="{{vehiclePhotos}}"
+            wx:key="key"
+            class="photo-slot {{index === 0 ? 'photo-slot--active' : ''}} {{item.path ? 'photo-slot--filled' : ''}} {{index === dragIndex ? 'photo-slot--dragging' : ''}} {{index === dragOverIndex && dragIndex !== -1 ? 'photo-slot--drag-over' : ''}}"
+            bindtap="chooseVehiclePhoto"
+            bindlongpress="startPhotoDrag"
+            catchtouchmove="onPhotoTouchMove"
+            bindtouchend="onPhotoTouchEnd"
+            bindtouchcancel="onPhotoTouchEnd"
+            data-index="{{index}}"
+          >
+            <block wx:if="{{item.path}}">
+              <image class="photo-slot__image" src="{{item.path}}" mode="aspectFill"></image>
+              <view class="photo-slot__filled-guide">
+                <image src="{{item.icon}}" mode="aspectFit"></image>
+              </view>
+              <view class="photo-slot__delete" catchtap="removeVehiclePhoto" data-index="{{index}}">
+                <text>×</text>
+              </view>
+            </block>
+            <block wx:else>
+              <text class="photo-slot__index">{{item.index}}</text>
+              <text class="photo-slot__guide-title">角度参考</text>
+              <image class="photo-slot__icon" src="{{item.icon}}" mode="aspectFit"></image>
+            </block>
+            <view class="photo-slot__plus">+</view>
+            <view class="photo-slot__label">{{item.label}}</view>
+          </view>
+        </view>
+        <text class="photo-tip">按角度参考上传；已上传图片可长按拖拽换位，点击 × 删除</text>
+      </view>
+
+      <view class="section-card points-card">
+        <view class="section-heading">
+          <view class="section-heading__main">
+            <view class="section-number">03</view>
+            <text class="section-title">车辆卖点</text>
+          </view>
+          <button class="text-button" bindtap="openVehicleDetails" hover-class="none">
+            <text>完善信息</text>
+            <text class="chevron">›</text>
+          </button>
+        </view>
+        <view class="points-field">
+          <textarea
+            class="points-input"
+            maxlength="300"
+            placeholder="例如：空间宽敞、配置丰富、保养齐全…"
+            placeholder-class="points-input__placeholder"
+            value="{{sellingPoints}}"
+            bindinput="onSellingPointsInput"
+          ></textarea>
+          <text class="points-counter">{{sellingPoints.length}} / 300</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="bottom-action-bar">
+    <view class="bottom-action-bar__buttons">
+      <button class="secondary-button" bindtap="saveDraft" loading="{{saving}}" disabled="{{saving}}" hover-class="none">存草稿</button>
+      <button class="primary-button" bindtap="saveAndContinue" loading="{{saving}}" disabled="{{saving}}" hover-class="none">
+        <text>保存并返回列表</text>
+        <text class="primary-button__arrow">→</text>
+      </button>
+    </view>
+    <text class="bottom-hint">信息先保存，视频稍后生成</text>
+    <view class="home-indicator"></view>
+  </view>
+</view>

@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+miniprogram_npm/
+backend/data/
+backend/.env
+backend/.venv/
+__pycache__/
+*.py[cod]
+project.private.config.json
