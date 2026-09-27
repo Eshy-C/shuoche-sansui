@@ -1,5 +1,54 @@
 const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000/api';
 const COLLECTION_NAME = 'vehicle_records';
+let accessPrompt = null;
+
+function accessTokenKey() {
+  return `shuoche-api-token:${getApiBaseURL()}`;
+}
+
+function authorizationHeader() {
+  const token = wx.getStorageSync(accessTokenKey());
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function askAccessToken() {
+  if (accessPrompt) {
+    return accessPrompt;
+  }
+  accessPrompt = new Promise((resolve, reject) => {
+    wx.showModal({
+      title: '连接车辆资料库',
+      content: '',
+      editable: true,
+      placeholderText: '粘贴管理员提供的访问口令',
+      confirmText: '连接',
+      success: (result) => {
+        const token = String(result.content || '').trim();
+        if (!result.confirm || !token) {
+          reject(new Error('尚未输入访问口令，资料仍保存在本机'));
+          return;
+        }
+        wx.setStorageSync(accessTokenKey(), token);
+        resolve();
+      },
+      fail: reject,
+    });
+  }).finally(() => { accessPrompt = null; });
+  return accessPrompt;
+}
+
+async function withAuthorization(operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error.statusCode !== 401) {
+      throw error;
+    }
+    wx.removeStorageSync(accessTokenKey());
+    await askAccessToken();
+    return operation();
+  }
+}
 
 function getApiBaseURL() {
   try {
@@ -59,7 +108,7 @@ function createRequestError(response, fallbackMessage) {
   return error;
 }
 
-function requestJSON(path, options = {}) {
+function sendRequestJSON(path, options = {}) {
   return new Promise((resolve, reject) => {
     wx.request({
       url: buildURL(path),
@@ -67,9 +116,10 @@ function requestJSON(path, options = {}) {
       data: options.data,
       header: {
         'content-type': 'application/json',
+        ...authorizationHeader(),
         ...(options.header || {}),
       },
-      timeout: options.timeout || 20000,
+      timeout: options.timeout || 120000,
       success: (response) => {
         const data = parseResponseData(response.data);
         if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -83,12 +133,16 @@ function requestJSON(path, options = {}) {
   });
 }
 
+function requestJSON(path, options = {}) {
+  return withAuthorization(() => sendRequestJSON(path, options));
+}
+
 function getTempFileURLMap(fileIDs) {
   const uniqueIDs = uniqueFileIDs(fileIDs);
-  return Promise.resolve(uniqueIDs.reduce((map, fileID) => {
-    map[fileID] = `${buildURL('files')}?file_id=${encodeURIComponent(fileID)}`;
-    return map;
-  }, {}));
+  if (!uniqueIDs.length) {
+    return Promise.resolve({});
+  }
+  return requestJSON('file-urls', { method: 'POST', data: { file_ids: uniqueIDs } });
 }
 
 function parseVehiclePhotos(value) {
@@ -109,7 +163,10 @@ function parseVehiclePhotos(value) {
 }
 
 function hydrateRecord(record) {
-  const fileIDs = collectFileIDs(record);
+  const fileIDs = (record.vehiclePhotos || []).filter((photo) => !photo.path).map((photo) => photo.fileID);
+  if (!record.salesPhoto) {
+    fileIDs.push(record.salesPhotoFileID);
+  }
   return getTempFileURLMap(fileIDs).then((urlMap) => ({
     ...record,
     salesPhoto: record.salesPhoto || urlMap[record.salesPhotoFileID] || '',
@@ -134,12 +191,14 @@ function uploadImage(filePath, cloudPath) {
     return Promise.reject(new Error('上传图片缺少车辆档案 ID'));
   }
 
-  return new Promise((resolve, reject) => {
+  return withAuthorization(() => new Promise((resolve, reject) => {
     wx.uploadFile({
       url: buildURL(`records/${encodeURIComponent(recordId)}/files`),
       filePath,
       name: 'file',
       formData: { storage_key: cloudPath },
+      header: authorizationHeader(),
+      timeout: 120000,
       success: (response) => {
         const data = parseResponseData(response.data);
         if (response.statusCode >= 200 && response.statusCode < 300 && data.fileID) {
@@ -150,7 +209,7 @@ function uploadImage(filePath, cloudPath) {
       },
       fail: (error) => reject(createRequestError(error, '无法连接后端服务')),
     });
-  });
+  }));
 }
 
 function toCloudData(record) {
@@ -172,15 +231,7 @@ function toCloudData(record) {
 
 function fromCloudData(document) {
   const vehiclePhotos = parseVehiclePhotos(document.vehiclePhotos || document.vehicle_photos);
-  const fileIDs = vehiclePhotos.map((photo) => photo.fileID).filter(Boolean);
   const salesPhotoFileID = document.salesPhotoFileID || document.sales_photo_file_id || '';
-  const urlMap = {};
-  if (salesPhotoFileID) {
-    urlMap[salesPhotoFileID] = `${buildURL('files')}?file_id=${encodeURIComponent(salesPhotoFileID)}`;
-  }
-  fileIDs.forEach((fileID) => {
-    urlMap[fileID] = `${buildURL('files')}?file_id=${encodeURIComponent(fileID)}`;
-  });
 
   return {
     id: document.id || document.record_id || '',
@@ -188,10 +239,10 @@ function fromCloudData(document) {
     cloudSynced: document.cloudSynced !== false,
     name: document.name || '',
     salesPhotoFileID,
-    salesPhoto: document.salesPhoto || urlMap[salesPhotoFileID] || '',
+    salesPhoto: document.salesPhoto || '',
     vehiclePhotos: vehiclePhotos.map((photo) => ({
       ...photo,
-      path: photo.path || urlMap[photo.fileID] || '',
+      path: photo.path || '',
     })),
     sellingPoints: document.sellingPoints || document.selling_points || '',
     createdAt: Number(document.createdAt || document.created_at) || Date.now(),
@@ -243,6 +294,9 @@ async function deleteRecord(record) {
 
 function getErrorMessage(error) {
   const message = error && (error.errMsg || error.message || error.detail || error.error);
+  if (error && error.statusCode === 401) {
+    return '访问口令不正确，请重新输入后再保存';
+  }
   if (error && error.statusCode === 404) {
     return '后端接口不存在，请确认 FastAPI 已启动并使用最新代码';
   }
