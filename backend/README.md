@@ -2,6 +2,13 @@
 
 这是车辆档案的 FastAPI 后端。开发时可以使用 SQLite 和本地文件；正式环境使用 PostgreSQL 和私有 S3 兼容对象存储。本次部署使用 Supabase 保存数据库和图片，Render 运行 Python API。
 
+## 当前部署
+
+- 公网服务：`https://shuoche-sansui-api.onrender.com`。
+- 健康检查：`https://shuoche-sansui-api.onrender.com/health`，正常返回 `{"ok":true,"storage":"s3"}`。
+- 小程序 `app.js` 已切换为公网 API；本地调试时可改回 `http://127.0.0.1:8000/api`。
+- 公网后端上线不等于小程序已发布；微信公众平台的服务器域名配置和真机验证需另行完成。
+
 ## 本地运行
 
 ```bash
