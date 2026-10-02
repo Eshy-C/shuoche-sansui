@@ -59,12 +59,21 @@ function parseResponseData(data) {
 }
 
 function createRequestError(response, fallbackMessage) {
-  const detail = response && response.detail;
-  const error = new Error(detail || response && response.message || fallbackMessage);
+  const detail = response && (response.detail || response.errMsg || response.message);
+  const error = new Error(detail || fallbackMessage);
   error.statusCode = response && response.statusCode;
   error.detail = detail;
+  error.errMsg = response && response.errMsg;
   error.response = response;
   return error;
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function isRetryableNetworkError(error) {
+  return !error || !error.statusCode;
 }
 
 function sendRequestJSON(path, options = {}) {
@@ -93,7 +102,25 @@ function sendRequestJSON(path, options = {}) {
 }
 
 function requestJSON(path, options = {}) {
-  return withAuthorization(() => sendRequestJSON(path, options));
+  const method = String(options.method || 'GET').toUpperCase();
+  const retryOnNetwork = options.retryOnNetwork === true || method === 'GET';
+  const maxAttempts = retryOnNetwork ? 3 : 1;
+
+  return (async () => {
+    let lastError;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        return await withAuthorization(() => sendRequestJSON(path, options));
+      } catch (error) {
+        lastError = error;
+        if (!retryOnNetwork || !isRetryableNetworkError(error) || attempt === maxAttempts - 1) {
+          throw error;
+        }
+        await wait(2500 * (attempt + 1));
+      }
+    }
+    throw lastError;
+  })();
 }
 
 function getTempFileURLMap(fileIDs) {
@@ -101,7 +128,11 @@ function getTempFileURLMap(fileIDs) {
   if (!uniqueIDs.length) {
     return Promise.resolve({});
   }
-  return requestJSON('file-urls', { method: 'POST', data: { file_ids: uniqueIDs } });
+  return requestJSON('file-urls', {
+    method: 'POST',
+    data: { file_ids: uniqueIDs },
+    retryOnNetwork: true,
+  });
 }
 
 function parseVehiclePhotos(value) {
@@ -260,7 +291,7 @@ function getErrorMessage(error) {
     return '后端接口不存在，请确认 FastAPI 已启动并使用最新代码';
   }
   if (String(message || '').indexOf('无法连接后端服务') !== -1) {
-    return '无法连接后端服务，请先启动 FastAPI，或把 app.js 的 API 地址改成已部署的 HTTPS 地址';
+    return '云端服务可能正在从休眠中唤醒，请稍后重试；若持续失败，请检查微信后台的 request 合法域名';
   }
   return message || '后端服务暂时不可用';
 }
