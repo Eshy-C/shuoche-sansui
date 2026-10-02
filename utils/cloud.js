@@ -290,7 +290,12 @@ function getErrorMessage(error) {
   if (error && error.statusCode === 404) {
     return '后端接口不存在，请确认 FastAPI 已启动并使用最新代码';
   }
-  if (String(message || '').indexOf('无法连接后端服务') !== -1) {
+  const networkMessage = String(message || '');
+  if (
+    networkMessage.indexOf('无法连接后端服务') !== -1
+    || networkMessage.indexOf('request:fail') !== -1
+    || (error && !error.statusCode && error.errMsg)
+  ) {
     return '云端服务可能正在从休眠中唤醒，请稍后重试；若持续失败，请检查微信后台的 request 合法域名';
   }
   return message || '后端服务暂时不可用';
