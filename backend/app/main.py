@@ -32,6 +32,7 @@ for prefix in ("postgres://", "postgresql://"):
         DATABASE_URL = DATABASE_URL.replace(prefix, "postgresql+psycopg://", 1)
 PUBLIC_BASE_URL = (os.getenv("PUBLIC_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL") or "http://127.0.0.1:8000").rstrip("/")
 API_ACCESS_TOKEN = os.getenv("API_ACCESS_TOKEN", "").strip()
+API_AUTH_REQUIRED = os.getenv("API_AUTH_REQUIRED", "false").strip().lower() in {"1", "true", "yes", "on"}
 APP_ENV = os.getenv("APP_ENV", "development")
 R2_ENDPOINT = os.getenv("R2_ENDPOINT", "").strip()
 R2_BUCKET = os.getenv("R2_BUCKET", "").strip()
@@ -46,9 +47,9 @@ if any(STORAGE_SETTINGS) and not all(STORAGE_SETTINGS):
 if APP_ENV == "production" and (
     not DATABASE_URL.startswith("postgresql+psycopg://")
     or not all(STORAGE_SETTINGS)
-    or len(API_ACCESS_TOKEN) < 24
+    or (API_AUTH_REQUIRED and len(API_ACCESS_TOKEN) < 24)
 ):
-    raise RuntimeError("正式环境必须配置 PostgreSQL、对象存储和至少 24 位的 API_ACCESS_TOKEN")
+    raise RuntimeError("正式环境必须配置 PostgreSQL 和对象存储；启用接口鉴权时还需要至少 24 位的 API_ACCESS_TOKEN")
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -233,10 +234,12 @@ app.add_middleware(
 
 @app.middleware("http")
 async def require_access_token(request: Request, call_next):
-    if API_ACCESS_TOKEN and request.url.path.startswith("/api/"):
+    if request.url.path.startswith("/api/"):
         provided = request.headers.get("Authorization", "")
-        authorized = hmac.compare_digest(provided.encode(), f"Bearer {API_ACCESS_TOKEN}".encode())
-        if request.method == "GET" and request.url.path == "/api/files" and not authorized:
+        authorized = bool(API_ACCESS_TOKEN) and hmac.compare_digest(
+            provided.encode(), f"Bearer {API_ACCESS_TOKEN}".encode()
+        )
+        if request.method == "GET" and request.url.path == "/api/files" and API_ACCESS_TOKEN and not authorized:
             file_id = request.query_params.get("file_id", "")
             try:
                 expires = int(request.query_params.get("expires", "0"))
@@ -246,7 +249,10 @@ async def require_access_token(request: Request, call_next):
             authorized = expires > int(time.time()) and hmac.compare_digest(
                 signature.encode(), file_signature(file_id, expires).encode()
             )
-        if not authorized:
+        if (
+            (request.method == "GET" and request.url.path == "/api/files" and API_ACCESS_TOKEN and not authorized)
+            or (API_AUTH_REQUIRED and not authorized)
+        ):
             return JSONResponse(status_code=401, content={"detail": "请输入正确的访问口令"})
     return await call_next(request)
 

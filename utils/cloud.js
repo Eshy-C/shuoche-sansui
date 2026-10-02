@@ -1,53 +1,12 @@
 const DEFAULT_API_BASE_URL = 'https://shuoche-sansui-api.onrender.com/api';
 const COLLECTION_NAME = 'vehicle_records';
-let accessPrompt = null;
-
-function accessTokenKey() {
-  return `shuoche-api-token:${getApiBaseURL()}`;
-}
 
 function authorizationHeader() {
-  const token = wx.getStorageSync(accessTokenKey());
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-function askAccessToken() {
-  if (accessPrompt) {
-    return accessPrompt;
-  }
-  accessPrompt = new Promise((resolve, reject) => {
-    wx.showModal({
-      title: '连接车辆资料库',
-      content: '',
-      editable: true,
-      placeholderText: '粘贴管理员提供的访问口令',
-      confirmText: '连接',
-      success: (result) => {
-        const token = String(result.content || '').trim();
-        if (!result.confirm || !token) {
-          reject(new Error('尚未输入访问口令，资料仍保存在本机'));
-          return;
-        }
-        wx.setStorageSync(accessTokenKey(), token);
-        resolve();
-      },
-      fail: reject,
-    });
-  }).finally(() => { accessPrompt = null; });
-  return accessPrompt;
+  return {};
 }
 
 async function withAuthorization(operation) {
-  try {
-    return await operation();
-  } catch (error) {
-    if (error.statusCode !== 401) {
-      throw error;
-    }
-    wx.removeStorageSync(accessTokenKey());
-    await askAccessToken();
-    return operation();
-  }
+  return operation();
 }
 
 function getApiBaseURL() {
@@ -295,7 +254,7 @@ async function deleteRecord(record) {
 function getErrorMessage(error) {
   const message = error && (error.errMsg || error.message || error.detail || error.error);
   if (error && error.statusCode === 401) {
-    return '访问口令不正确，请重新输入后再保存';
+    return '云端接口拒绝访问，请检查后端服务配置';
   }
   if (error && error.statusCode === 404) {
     return '后端接口不存在，请确认 FastAPI 已启动并使用最新代码';

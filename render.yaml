@@ -11,6 +11,8 @@ services:
     envVars:
       - key: APP_ENV
         value: production
+      - key: API_AUTH_REQUIRED
+        value: "false"
       - key: API_ACCESS_TOKEN
         generateValue: true
       - key: DATABASE_URL
